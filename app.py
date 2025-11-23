@@ -2,37 +2,55 @@ import streamlit as st
 import requests
 import json
 import base64
+import time
 
-# --- 設定頁面 ---
+# --- 1. 設定頁面 (手機版面優化) ---
 st.set_page_config(
     page_title="腎友食安守門員",
     page_icon="🛡️",
-    layout="wide"
+    layout="wide",
+    initial_sidebar_state="collapsed" # 手機上預設收合側邊欄，讓畫面更清爽
 )
 
-# --- CSS 美化 ---
+# --- 2. CSS 美化 (大按鈕、清晰卡片) ---
 st.markdown("""
     <style>
     .main { background-color: #f8fafc; }
-    .stButton>button { border-radius: 12px; height: 3em; font-weight: bold; }
-    .status-card {
-        background-color: #e0f2fe; border-left: 5px solid #0284c7;
-        padding: 15px; border-radius: 5px; color: #0c4a6e; margin-bottom: 20px;
+    .stButton>button { 
+        border-radius: 12px; 
+        height: 3.5em; 
+        font-weight: bold; 
+        width: 100%; /* 滿版按鈕，方便手指點擊 */
+        font-size: 1.1em;
     }
-    .comor-tag {
-        display: inline-block;
-        background-color: #ffe4e6;
-        color: #be123c;
-        padding: 2px 8px;
-        border-radius: 12px;
-        font-size: 0.8em;
-        margin-right: 5px;
+    .status-card {
+        background-color: #e0f2fe; 
+        border-left: 5px solid #0284c7;
+        padding: 15px; 
+        border-radius: 8px; 
+        color: #0c4a6e; 
+        margin-bottom: 20px;
+        font-size: 1.0em;
+    }
+    .result-card {
+        padding: 20px;
+        border-radius: 10px;
+        margin-bottom: 20px;
+        text-align: center;
+        color: white;
         font-weight: bold;
+        font-size: 1.5em;
+    }
+    /* 手機適配 */
+    @media (max-width: 640px) {
+        h1 { font-size: 1.8rem; }
+        h2 { font-size: 1.5rem; }
+        .stButton>button { font-size: 1.0rem; }
     }
     </style>
 """, unsafe_allow_html=True)
 
-# --- 專業指引知識庫 (含 KDOQI 2020) ---
+# --- 3. 專業指引知識庫 (含 KDOQI 2020) ---
 GUIDELINE_CONTEXT = """
 【核心營養指引準則】
 請綜合參考以下權威文獻進行判斷：
@@ -45,20 +63,20 @@ GUIDELINE_CONTEXT = """
    - **鈉**: 強烈建議限制 < 2.3 g/day。
    - **鉀/磷**: 需依血值調整，通常需限制高鉀高磷食物。
 
-2. **Nutr Sci J 2022**:
+2. **Nutr Sci J 2022 (台灣)**:
    - 加工食品無機磷吸收率 100%，應絕對避免。
    
 3. **AJKD 2024**:
    - 維生素 A/E 不建議常規補充。
    - 綜合維他命需個別評估。
 
-【判斷邏輯與矛盾處理】
-- **你的判斷為最終依據 (AI Override)**。
-- 如果系統初步判斷為綠燈，但你發現成分中有嚴重隱患（如糖尿病患吃到精緻糖、透析患吃到高鉀果乾、加工食品含無機磷），請務必將 `final_risk_level` 改為 "red" 或 "yellow"。
-- **標題要求**：若判定為紅燈，`summary_title` 必須明確寫出「紅燈（不建議食用）！」。
+【判斷邏輯與矛盾處理 (AI Override)】
+- **你的判斷擁有最高優先權**。
+- 系統可能會因為數值低而給出「綠燈」，但若你發現該食品成分對該病患有風險（例如：糖尿病患吃精緻糖、透析患吃高鉀果乾、加工食品含無機磷），請務必將 `final_risk_level` 改為 "red" 或 "yellow"。
+- **標題強制要求**：若你判定為紅燈，`summary_title` 必須明確寫出「紅燈（不建議食用）！」。
 """
 
-# --- 風險關鍵字資料庫 ---
+# --- 4. 風險關鍵字資料庫 ---
 RISK_KEYWORDS = {
     "inorganic_phosphate": [
         "磷酸", "偏磷酸", "焦磷酸", "三聚磷酸", "polyphosphate", 
@@ -79,7 +97,7 @@ RISK_KEYWORDS = {
     ]
 }
 
-# --- Session State 初始化 ---
+# --- 5. Session State 初始化 ---
 if 'form_data' not in st.session_state:
     st.session_state.form_data = {
         "calories": 0.0, "protein": 0.0, "sodium": 0.0, 
@@ -94,10 +112,17 @@ if 'context_chat_history' not in st.session_state:
 if 'general_chat_history' not in st.session_state: 
     st.session_state.general_chat_history = []
 
-# --- 側邊欄設定 ---
+# --- 6. 側邊欄設定 ---
 with st.sidebar:
     st.title("🛡️ 腎友食安守門員")
-    api_key = st.text_input("Gemini API Key", type="password", placeholder="請輸入 API Key")
+    
+    # 自動讀取 Secrets 或手動輸入
+    api_key = ""
+    if "GEMINI_API_KEY" in st.secrets:
+        api_key = st.secrets["GEMINI_API_KEY"]
+        st.success("✅ 已載入系統金鑰")
+    else:
+        api_key = st.text_input("Gemini API Key", type="password", placeholder="請輸入 API Key")
     
     st.divider()
     st.subheader("👤 病患狀態設定")
@@ -107,7 +132,7 @@ with st.sidebar:
     patient_status_desc = ""
     if treatment_status == "透析":
         dialysis_type = st.radio("透析種類", ["血液透析", "腹膜透析"])
-        st.info("💡 依據 KDOQI 2020：透析病患需攝取足夠蛋白質 (1.0-1.2 g/kg)，並留意水溶性維生素補充。")
+        st.info("💡 KDOQI 2020：透析病患需攝取足夠蛋白質 (1.0-1.2 g/kg)。")
         patient_status_desc = f"透析病患 - {dialysis_type}"
     else:
         ckd_stage_opt = st.selectbox("請選擇分期", [
@@ -137,7 +162,7 @@ with st.sidebar:
     
     st.session_state.comorbidity_desc = "、".join(comorbidities) if comorbidities else "無"
 
-# --- 核心邏輯函數 ---
+# --- 7. 核心邏輯函數 ---
 
 def analyze_food_rules():
     """本地規則分析 (初步篩檢)"""
@@ -147,6 +172,7 @@ def analyze_food_rules():
     data = st.session_state.form_data
     ingredients = data["ingredients"]
     
+    # 無數據處理
     if data["calories"] == 0 and data["sodium"] == 0 and data["protein"] == 0:
         st.session_state.analysis_result = {
             "risk_level": "unknown",
@@ -160,6 +186,7 @@ def analyze_food_rules():
         "sodium_warning": False, "p_ratio_warning": None, "k_level": None
     }
     
+    # 關鍵字掃描
     for kw in RISK_KEYWORDS["inorganic_phosphate"]:
         if kw in ingredients: findings["inorganic_p"].append(kw)
     for kw in RISK_KEYWORDS["high_potassium_food"]:
@@ -180,15 +207,18 @@ def analyze_food_rules():
         
     if data["sodium"] > 200: findings["sodium_warning"] = True
     
+    # 規則判斷
     risk_level = "green"
     is_diabetic_risk = "糖尿病" in st.session_state.comorbidity_desc and len(findings["high_sugar"]) > 0
 
+    # 紅燈條件
     if (data["sodium"] > 400 or 
         len(findings["inorganic_p"]) > 0 or 
         "氯化鉀" in ingredients or 
         findings["k_level"] == "High" or
         is_diabetic_risk):
         risk_level = "red"
+    # 黃燈條件
     elif (data["sodium"] > 200 or 
           len(findings["high_k_food"]) > 0 or 
           len(findings["dairy"]) > 0 or
@@ -196,7 +226,12 @@ def analyze_food_rules():
         risk_level = "yellow"
         
     if risk_level == "red":
-        summary = "紅燈（不建議食用）！含有高風險成分。"
+        summary = "紅燈（不建議食用）！"
+        reasons = []
+        if len(findings["inorganic_p"]) > 0: reasons.append("含磷酸鹽添加物")
+        if data["sodium"] > 400: reasons.append("鈉含量過高")
+        if is_diabetic_risk: reasons.append("糖尿病患者不宜食用高糖")
+        if reasons: summary += "原因：" + "、".join(reasons)
     elif risk_level == "yellow":
         summary = "需注意！建議淺嚐。"
     else:
@@ -209,7 +244,7 @@ def analyze_food_rules():
 def extract_data_from_image(uploaded_file, api_key):
     """OCR 與 產品辨識"""
     if not api_key:
-        st.error("請先設定 API Key")
+        st.error("⚠️ 請先輸入 API Key 才能使用 AI 功能")
         return False
 
     try:
@@ -247,6 +282,7 @@ def extract_data_from_image(uploaded_file, api_key):
             extracted_data = json.loads(raw_text)
             st.session_state.form_data.update(extracted_data)
             
+            # 讀取成功後，立即清空舊結果
             st.session_state.analysis_result = None
             st.session_state.ai_advice = None
             st.session_state.context_chat_history = []
@@ -262,7 +298,7 @@ def extract_data_from_image(uploaded_file, api_key):
 def call_gemini_deep_analysis(prompt):
     """AI 深度分析 - 支援覆蓋規則判斷 (Override Rule)"""
     if not api_key:
-        st.error("請先在左側輸入 API Key")
+        st.error("⚠️ 請先輸入 API Key 才能呼叫 AI")
         return None
 
     patient_status = st.session_state.get("patient_status_desc", "未設定")
@@ -318,7 +354,7 @@ def call_gemini_deep_analysis(prompt):
 # --- 聊天室 API 函數 ---
 def call_gemini_chat(prompt, chat_history_key=None):
     if not api_key:
-        st.error("請先在左側輸入 API Key")
+        st.error("⚠️ 請先輸入 API Key")
         return None
     
     patient_status = st.session_state.get("patient_status_desc", "未設定")
@@ -353,7 +389,7 @@ def call_gemini_chat(prompt, chat_history_key=None):
         st.error(f"連線錯誤: {str(e)}")
         return None
 
-# --- UI 主畫面佈局 ---
+# --- 8. UI 主畫面佈局 ---
 
 tab1, tab2 = st.tabs(["📊 食品掃描與分析", "💬 AI 諮詢室"])
 
@@ -368,6 +404,7 @@ with tab1:
     </div>
     """, unsafe_allow_html=True)
 
+    # 圖片上傳區
     with st.expander("📸 圖片辨識 (上傳營養標示或產品正面)", expanded=True):
         uploaded_file = st.file_uploader("上傳照片 (JPG/PNG)", type=["jpg", "png", "jpeg"])
         if uploaded_file:
@@ -384,6 +421,7 @@ with tab1:
                         else:
                             st.error("讀取失敗。")
 
+    # 數據確認區
     st.subheader("📝 確認數據 / 產品資訊")
     c1, c2 = st.columns(2)
     with c1:
@@ -398,26 +436,32 @@ with tab1:
 
     st.markdown("---")
     
+    # 執行規則分析按鈕
     if st.button("🔍 執行分析 (規則判斷)", type="primary", use_container_width=True):
         analyze_food_rules()
         st.rerun()
 
+    # 顯示結果區
     if st.session_state.analysis_result:
         res = st.session_state.analysis_result
         
         # 取得最終風險等級 (可能是規則給的，也可能是 AI 修正覆蓋後的)
         risk_level = res['risk_level']
         
-        # 決定顯示標題：如果是 AI 修正後的結果，優先使用 analysis_result['summary'] (因為上面已經被 AI 更新過)
-        # 如果 AI 還沒跑，就是規則的 summary
+        # 決定顯示標題
         display_summary = res['summary']
-
+        
+        # 依據等級顯示顏色
         if risk_level == "unknown":
             st.info(f"### {display_summary}") 
-        else:
-            color_map = {"green": "success", "yellow": "warning", "red": "error"}
-            getattr(st, color_map[risk_level])(f"### {display_summary}")
+        elif risk_level == "red":
+            st.error(f"### {display_summary}") # 使用 st.error 顯示紅色
+        elif risk_level == "yellow":
+            st.warning(f"### {display_summary}") # 使用 st.warning 顯示黃色
+        elif risk_level == "green":
+            st.success(f"### {display_summary}") # 使用 st.success 顯示綠色
 
+        # 顯示警示標籤
         if res['findings']['inorganic_p']:
             st.error(f"⚠️ 檢出無機磷：{', '.join(res['findings']['inorganic_p'])}")
         if res['findings']['dairy']:
@@ -425,7 +469,7 @@ with tab1:
         if res['findings']['high_sugar']:
             st.warning(f"🍬 檢出高糖成分：{', '.join(res['findings']['high_sugar'])}")
         
-        # AI 深度解析按鈕
+        # AI 深度解析按鈕與顯示
         if not st.session_state.ai_advice:
             if st.button("✨ 呼叫 AI 營養師深度解析 (推薦)"):
                 prompt = f"分析食品: {st.session_state.form_data}. 若數值為0，請根據產品名稱與成分描述進行定性評估。"
