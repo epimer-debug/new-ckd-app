@@ -48,33 +48,34 @@ st.markdown("""
         box-shadow: 0 2px 4px rgba(0,0,0,0.05);
     }
     
-    /* === 全螢幕置中載入動畫 === */
+    /* === 關鍵修改：全螢幕置中載入動畫 === */
     .loading-overlay {
         position: fixed;
         top: 0;
         left: 0;
         width: 100%;
         height: 100%;
-        background-color: rgba(255, 255, 255, 0.85); /* 半透明白底 */
-        z-index: 9999; /* 最上層 */
+        background-color: rgba(255, 255, 255, 0.9); /* 背景更白一點 */
+        z-index: 99999; /* 確保在最上層 */
         display: flex;
         flex-direction: column;
         align-items: center;
         justify-content: center;
-        backdrop-filter: blur(5px); /* 背景模糊效果 */
+        backdrop-filter: blur(5px);
     }
     .loading-content {
         background: white;
-        padding: 30px;
-        border-radius: 20px;
-        box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+        padding: 40px;
+        border-radius: 25px;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.15);
         text-align: center;
+        min-width: 300px;
     }
     .loading-text {
-        margin-top: 20px;
+        margin-top: 25px;
         color: #0284c7;
         font-weight: bold;
-        font-size: 1.5em; /* 字體加大 */
+        font-size: 1.8em; /* 字體加大 */
         animation: blink 1.5s infinite;
     }
     @keyframes blink {
@@ -82,12 +83,25 @@ st.markdown("""
         50% { opacity: 0.5; }
         100% { opacity: 1; }
     }
+    /* 側邊欄按鈕提示 */
+    [data-testid="stSidebarCollapsedControl"]::after {
+        content: "病人基本資料設定";
+        margin-left: 8px;
+        font-weight: bold;
+        color: #0284c7;
+        font-size: 1rem;
+        vertical-align: middle;
+    }
     
     /* 手機適配 */
     @media (max-width: 640px) {
         h1 { font-size: 1.8rem; }
         h2 { font-size: 1.5rem; }
         .stButton>button { font-size: 1.0rem; }
+        [data-testid="stSidebarCollapsedControl"]::after {
+            content: "設定病人資料";
+            font-size: 0.9rem;
+        }
     }
     </style>
 """, unsafe_allow_html=True)
@@ -156,9 +170,7 @@ if 'general_chat_history' not in st.session_state:
 
 # --- 6. 側邊欄設定 ---
 with st.sidebar:
-    # --- 修正：將提示放在這裡，使用 CSS 讓它看起來像是指向按鈕 ---
-    # 注意：實際的箭頭是 Streamlit UI 的一部分，無法直接放入，但我們可以透過版面設計來引導
-    st.markdown("### ⚙️ 病人基本資料設定") # 標題改得更明確
+    st.header("⚙️ 病人基本資料設定") 
     
     api_key = ""
     if "GEMINI_API_KEY" in st.secrets:
@@ -213,6 +225,7 @@ def analyze_food_rules():
     data = st.session_state.form_data
     ingredients = data["ingredients"]
     
+    # 無數據處理
     if data["calories"] == 0 and data["sodium"] == 0 and data["protein"] == 0:
         st.session_state.analysis_result = {
             "risk_level": "unknown",
@@ -458,7 +471,7 @@ with tab1:
                     placeholder.markdown("""
                         <div class='loading-overlay'>
                             <div class='loading-content'>
-                                <img src='https://media.giphy.com/media/3oEjI6SIIHBdRxXI40/giphy.gif' width='80'>
+                                <img src='https://media.giphy.com/media/3oEjI6SIIHBdRxXI40/giphy.gif' width='150'>
                                 <div class='loading-text'>AI 正在讀取圖片中...</div>
                             </div>
                         </div>
@@ -524,7 +537,7 @@ with tab1:
                 placeholder.markdown("""
                     <div class='loading-overlay'>
                         <div class='loading-content'>
-                            <img src='https://media.giphy.com/media/3oEjI6SIIHBdRxXI40/giphy.gif' width='80'>
+                            <img src='https://media.giphy.com/media/3oEjI6SIIHBdRxXI40/giphy.gif' width='150'>
                             <div class='loading-text'>AI 營養師正在評估中...</div>
                         </div>
                     </div>
@@ -544,16 +557,39 @@ with tab1:
             st.markdown(st.session_state.ai_advice['detailed_analysis'])
             st.info(f"💡 **食用建議**：{st.session_state.ai_advice['serving_suggestion']}")
             
-            # 追問
-            for msg in st.session_state.context_chat_history:
-                st.chat_message(msg["role"]).write(msg["content"])
-            if q := st.chat_input("對此食品有疑問？"):
-                st.session_state.context_chat_history.append({"role":"user", "content":q})
-                st.chat_message("user").write(q)
-                ans = call_gemini_chat(f"Context: {json.dumps(st.session_state.ai_advice)}. User: {q}", "context_chat_history")
-                if ans:
-                    st.session_state.context_chat_history.append({"role":"assistant", "content":ans})
-                    st.chat_message("assistant").write(ans)
+            # 追問 (使用一般輸入框，當作追問的入口)
+            st.markdown("---")
+            st.subheader("🙋‍♀️ 還有疑問嗎？")
+            
+            # 這裡使用 chat_input 是不行的，因為它會固定在底部，我們使用普通的 text_input + button
+            follow_up_q = st.text_input("請輸入您的問題 (例如：我可以只吃一半嗎？)", key="follow_up_input")
+            if st.button("送出問題", key="follow_up_btn"):
+                if follow_up_q:
+                    # 將問題加入下方聊天室的歷史紀錄
+                    st.session_state.general_chat_history.append({"role":"user", "content":follow_up_q})
+                    
+                    # 呼叫 AI，並帶入上方深度分析的 Context
+                    placeholder = st.empty()
+                    placeholder.markdown("""
+                        <div class='loading-overlay'>
+                            <div class='loading-content'>
+                                <img src='https://media.giphy.com/media/3oEjI6SIIHBdRxXI40/giphy.gif' width='150'>
+                                <div class='loading-text'>AI 正在思考中...</div>
+                            </div>
+                        </div>
+                    """, unsafe_allow_html=True)
+
+                    # 組合 Prompt
+                    context = json.dumps(st.session_state.ai_advice, ensure_ascii=False)
+                    full_prompt = f"關於剛剛分析的食品報告：{context}。使用者追問：{follow_up_q}"
+                    
+                    ans = call_gemini_chat(full_prompt, "general_chat_history")
+                    placeholder.empty()
+                    
+                    if ans:
+                        st.session_state.general_chat_history.append({"role":"assistant", "content":ans})
+                        # 自動切換到聊天室分頁看結果 (需使用者手動切換，或我們直接顯示在下方)
+                        st.success("已收到回答！請切換至【💬 AI 諮詢室】查看完整對話。")
 
 with tab2:
     st.markdown("### 💬 AI 營養諮詢室 (一般問答)")
@@ -562,8 +598,11 @@ with tab2:
     st.info(f"當前諮詢身份：{status_desc}")
     if comor_desc != "無": st.warning(f"⚠️ 共病考量：{comor_desc}")
 
+    # 顯示歷史訊息
     for msg in st.session_state.general_chat_history:
         st.chat_message(msg["role"]).write(msg["content"])
+        
+    # 底部聊天輸入框
     if q := st.chat_input("請問營養師..."):
         st.session_state.general_chat_history.append({"role":"user", "content":q})
         st.chat_message("user").write(q)
@@ -572,8 +611,8 @@ with tab2:
         placeholder.markdown("""
             <div class='loading-overlay'>
                 <div class='loading-content'>
-                    <img src='https://media.giphy.com/media/3oEjI6SIIHBdRxXI40/giphy.gif' width='80'>
-                    <div class='loading-text'>AI 正在輸入中...</div>
+                    <img src='https://media.giphy.com/media/3oEjI6SIIHBdRxXI40/giphy.gif' width='150'>
+                    <div class='loading-text'>AI 正在思考中...</div>
                 </div>
             </div>
         """, unsafe_allow_html=True)
