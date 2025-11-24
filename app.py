@@ -12,7 +12,7 @@ st.set_page_config(
     initial_sidebar_state="collapsed" # 手機上預設收合側邊欄，讓畫面更清爽
 )
 
-# --- 2. CSS 美化 (大按鈕、清晰卡片、置中大動畫) ---
+# --- 2. CSS 美化 (大按鈕、清晰卡片、置中大動畫、輸入框優化) ---
 st.markdown("""
     <style>
     .main { background-color: #f8fafc; }
@@ -48,15 +48,15 @@ st.markdown("""
         box-shadow: 0 2px 4px rgba(0,0,0,0.05);
     }
     
-    /* === 關鍵修改：全螢幕置中載入動畫 === */
+    /* === 全螢幕置中載入動畫 === */
     .loading-overlay {
         position: fixed;
         top: 0;
         left: 0;
         width: 100%;
         height: 100%;
-        background-color: rgba(255, 255, 255, 0.9); /* 背景更白一點 */
-        z-index: 99999; /* 確保在最上層 */
+        background-color: rgba(255, 255, 255, 0.9); 
+        z-index: 99999; 
         display: flex;
         flex-direction: column;
         align-items: center;
@@ -75,7 +75,7 @@ st.markdown("""
         margin-top: 25px;
         color: #0284c7;
         font-weight: bold;
-        font-size: 1.8em; /* 字體加大 */
+        font-size: 1.8em; 
         animation: blink 1.5s infinite;
     }
     @keyframes blink {
@@ -93,6 +93,18 @@ st.markdown("""
         vertical-align: middle;
     }
     
+    /* 強制底部輸入框樣式 */
+    .stChatInput {
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        padding: 1rem;
+        background: white;
+        z-index: 100;
+        border-top: 1px solid #e5e7eb;
+    }
+
     /* 手機適配 */
     @media (max-width: 640px) {
         h1 { font-size: 1.8rem; }
@@ -225,7 +237,6 @@ def analyze_food_rules():
     data = st.session_state.form_data
     ingredients = data["ingredients"]
     
-    # 無數據處理
     if data["calories"] == 0 and data["sodium"] == 0 and data["protein"] == 0:
         st.session_state.analysis_result = {
             "risk_level": "unknown",
@@ -466,7 +477,6 @@ with tab1:
                 st.image(uploaded_file, caption="預覽圖片", use_container_width=True)
             with col_btn:
                 if st.button("🚀 開始 AI 讀圖", type="primary"):
-                    # --- 全螢幕載入動畫 ---
                     placeholder = st.empty()
                     placeholder.markdown("""
                         <div class='loading-overlay'>
@@ -557,39 +567,40 @@ with tab1:
             st.markdown(st.session_state.ai_advice['detailed_analysis'])
             st.info(f"💡 **食用建議**：{st.session_state.ai_advice['serving_suggestion']}")
             
-            # 追問 (使用一般輸入框，當作追問的入口)
+            # 追問 (使用 st.chat_input 來實現)
             st.markdown("---")
             st.subheader("🙋‍♀️ 還有疑問嗎？")
             
-            # 這裡使用 chat_input 是不行的，因為它會固定在底部，我們使用普通的 text_input + button
-            follow_up_q = st.text_input("請輸入您的問題 (例如：我可以只吃一半嗎？)", key="follow_up_input")
-            if st.button("送出問題", key="follow_up_btn"):
-                if follow_up_q:
-                    # 將問題加入下方聊天室的歷史紀錄
-                    st.session_state.general_chat_history.append({"role":"user", "content":follow_up_q})
-                    
-                    # 呼叫 AI，並帶入上方深度分析的 Context
-                    placeholder = st.empty()
-                    placeholder.markdown("""
-                        <div class='loading-overlay'>
-                            <div class='loading-content'>
-                                <img src='https://media.giphy.com/media/3oEjI6SIIHBdRxXI40/giphy.gif' width='150'>
-                                <div class='loading-text'>AI 正在思考中...</div>
-                            </div>
+            # 使用 chat_input 來接收追問，這會固定在底部
+            if follow_up_q := st.chat_input("針對此食品有疑問嗎？ (例如：我可以只吃一半嗎？)", key="follow_up_chat"):
+                # 將問題加入聊天歷史
+                st.session_state.context_chat_history.append({"role":"user", "content":follow_up_q})
+                
+                # 顯示思考動畫
+                placeholder = st.empty()
+                placeholder.markdown("""
+                    <div class='loading-overlay'>
+                        <div class='loading-content'>
+                            <img src='https://media.giphy.com/media/3oEjI6SIIHBdRxXI40/giphy.gif' width='150'>
+                            <div class='loading-text'>AI 正在思考中...</div>
                         </div>
-                    """, unsafe_allow_html=True)
+                    </div>
+                """, unsafe_allow_html=True)
 
-                    # 組合 Prompt
-                    context = json.dumps(st.session_state.ai_advice, ensure_ascii=False)
-                    full_prompt = f"關於剛剛分析的食品報告：{context}。使用者追問：{follow_up_q}"
-                    
-                    ans = call_gemini_chat(full_prompt, "general_chat_history")
-                    placeholder.empty()
-                    
-                    if ans:
-                        st.session_state.general_chat_history.append({"role":"assistant", "content":ans})
-                        # 自動切換到聊天室分頁看結果 (需使用者手動切換，或我們直接顯示在下方)
-                        st.success("已收到回答！請切換至【💬 AI 諮詢室】查看完整對話。")
+                # 呼叫 AI
+                context = json.dumps(st.session_state.ai_advice, ensure_ascii=False)
+                full_prompt = f"關於剛剛分析的食品報告：{context}。使用者追問：{follow_up_q}"
+                ans = call_gemini_chat(full_prompt, "context_chat_history") # 注意這裡用 context_chat_history
+                
+                placeholder.empty()
+                
+                if ans:
+                    st.session_state.context_chat_history.append({"role":"assistant", "content":ans})
+
+            # 顯示該食品的追問歷史
+            for msg in st.session_state.context_chat_history:
+                st.chat_message(msg["role"]).write(msg["content"])
+
 
 with tab2:
     st.markdown("### 💬 AI 營養諮詢室 (一般問答)")
@@ -598,12 +609,10 @@ with tab2:
     st.info(f"當前諮詢身份：{status_desc}")
     if comor_desc != "無": st.warning(f"⚠️ 共病考量：{comor_desc}")
 
-    # 顯示歷史訊息
     for msg in st.session_state.general_chat_history:
         st.chat_message(msg["role"]).write(msg["content"])
         
-    # 底部聊天輸入框
-    if q := st.chat_input("請問營養師..."):
+    if q := st.chat_input("請問營養師...", key="general_chat"):
         st.session_state.general_chat_history.append({"role":"user", "content":q})
         st.chat_message("user").write(q)
         
