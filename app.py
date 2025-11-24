@@ -92,17 +92,30 @@ st.markdown("""
     }
     @keyframes blink { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } }
 
-    /* === 修復：對話輸入框樣式 (紅框) === */
+    /* === 紅框輸入區樣式 === */
+    .stChatInput {
+        position: fixed !important;
+        bottom: 20px !important;
+        left: 50% !important;
+        transform: translateX(-50%) !important;
+        width: 90% !important;
+        max-width: 800px !important;
+        z-index: 1000 !important;
+        padding-bottom: 20px !important; /* 避免被邊緣切到 */
+    }
+    
+    /* 針對 Streamlit 的聊天輸入框容器進行調整 */
     [data-testid="stChatInput"] {
-        border: 3px solid #ef4444 !important; /* 紅色邊框 */
-        border-radius: 15px !important;
-        background-color: #fff0f0 !important;
-        padding: 5px !important;
+        border: 3px solid #ef4444 !important; /* 明顯的紅框 */
+        border-radius: 25px !important;
+        background-color: #fff0f0 !important; /* 淡淡的紅色背景 */
+        padding: 10px !important;
+        box-shadow: 0 -5px 20px rgba(0,0,0,0.1) !important;
     }
     
     /* 增加主頁面底部的留白，防止內容被輸入框擋住 */
     .main .block-container {
-        padding-bottom: 150px !important; 
+        padding-bottom: 180px !important; 
     }
 
     /* 側邊欄按鈕文字 */
@@ -122,6 +135,7 @@ st.markdown("""
         h3 { font-size: 1.5rem !important; }
         .stButton>button { font-size: 1.2rem !important; height: 3.8em; }
         [data-testid="stSidebarCollapsedControl"]::after { content: "設定病人資料"; font-size: 1rem; }
+        .stChatInput { bottom: 10px !important; width: 95% !important; }
     }
     </style>
 """, unsafe_allow_html=True)
@@ -245,7 +259,6 @@ def analyze_food_rules():
     data = st.session_state.form_data
     ingredients = data["ingredients"]
     
-    # 無數據處理
     if data["calories"] == 0 and data["sodium"] == 0 and data["protein"] == 0:
         st.session_state.analysis_result = {
             "risk_level": "unknown",
@@ -477,6 +490,7 @@ with tab1:
     </div>
     """, unsafe_allow_html=True)
 
+    # 圖片上傳區
     with st.expander("📸 圖片辨識 (上傳營養標示或產品正面)", expanded=True):
         uploaded_file = st.file_uploader("上傳照片 (JPG/PNG)", type=["jpg", "png", "jpeg"])
         if uploaded_file:
@@ -496,13 +510,16 @@ with tab1:
                     """, unsafe_allow_html=True)
                     
                     success = extract_data_from_image(uploaded_file, api_key)
-                    placeholder.empty() 
+                    placeholder.empty() # 清除動畫
                     
                     if success:
                         st.success("讀取完成！")
                     else:
                         st.error("讀取失敗。")
+                else:
+                    st.info("AI 將自動讀取數值或辨識產品名稱...")
 
+    # 數據確認區
     st.subheader("📝 確認數據 / 產品資訊")
     c1, c2 = st.columns(2)
     with c1:
@@ -517,10 +534,12 @@ with tab1:
 
     st.markdown("---")
     
+    # 執行規則分析按鈕
     if st.button("🔍 執行分析 (規則判斷)", type="primary", use_container_width=True):
         analyze_food_rules()
         st.rerun()
 
+    # 顯示結果區
     if st.session_state.analysis_result:
         res = st.session_state.analysis_result
         
@@ -543,6 +562,7 @@ with tab1:
         if res['findings']['high_sugar']:
             st.warning(f"🍬 檢出高糖成分：{', '.join(res['findings']['high_sugar'])}")
         
+        # AI 深度解析按鈕與顯示
         if not st.session_state.ai_advice:
             if st.button("✨ 呼叫 AI 營養師深度解析 (推薦)"):
                 placeholder = st.empty()
@@ -569,10 +589,14 @@ with tab1:
             st.markdown(st.session_state.ai_advice['detailed_analysis'])
             st.info(f"💡 **食用建議**：{st.session_state.ai_advice['serving_suggestion']}")
             
-            # 追問 (使用 chat_input 固定在底部)
+            # 追問
             st.markdown("---")
-            st.subheader("🙋‍♀️ 還有疑問嗎？")
-            
+            st.markdown("""
+            <div style="text-align: center; margin-top: 20px; margin-bottom: 10px; font-weight: bold; color: #6b7280;">
+                👇 還有疑問嗎？請在下方紅框輸入...
+            </div>
+            """, unsafe_allow_html=True)
+
             # 顯示歷史對話
             for msg in st.session_state.context_chat_history:
                 st.chat_message(msg["role"]).write(msg["content"])
@@ -611,6 +635,12 @@ with tab2:
     for msg in st.session_state.general_chat_history:
         st.chat_message(msg["role"]).write(msg["content"])
         
+    st.markdown("""
+    <div style="text-align: center; margin-top: 20px; margin-bottom: 10px; font-weight: bold; color: #6b7280;">
+        👇 請在下方紅框輸入您的問題...
+    </div>
+    """, unsafe_allow_html=True)
+    
     if q := st.chat_input("請問營養師...", key="general_chat"):
         st.session_state.general_chat_history.append({"role":"user", "content":q})
         st.chat_message("user").write(q)
