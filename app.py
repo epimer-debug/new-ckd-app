@@ -93,18 +93,16 @@ st.markdown("""
     @keyframes blink { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } }
 
     /* === 修復：對話輸入框樣式 (紅框) === */
-    /* 針對 Streamlit 的聊天輸入框容器進行調整 */
     [data-testid="stChatInput"] {
-        border: 3px solid #ef4444 !important; /* 明顯的紅框 */
+        border: 3px solid #ef4444 !important; /* 紅色邊框 */
         border-radius: 15px !important;
-        background-color: #fff0f0 !important; /* 淡淡的紅色背景 */
+        background-color: #fff0f0 !important;
         padding: 5px !important;
-        margin-bottom: 20px !important; /* 確保離底部有距離 */
     }
     
     /* 增加主頁面底部的留白，防止內容被輸入框擋住 */
     .main .block-container {
-        padding-bottom: 180px !important; 
+        padding-bottom: 150px !important; 
     }
 
     /* 側邊欄按鈕文字 */
@@ -479,7 +477,6 @@ with tab1:
     </div>
     """, unsafe_allow_html=True)
 
-    # 圖片上傳區
     with st.expander("📸 圖片辨識 (上傳營養標示或產品正面)", expanded=True):
         uploaded_file = st.file_uploader("上傳照片 (JPG/PNG)", type=["jpg", "png", "jpeg"])
         if uploaded_file:
@@ -499,16 +496,13 @@ with tab1:
                     """, unsafe_allow_html=True)
                     
                     success = extract_data_from_image(uploaded_file, api_key)
-                    placeholder.empty() # 清除動畫
+                    placeholder.empty() 
                     
                     if success:
                         st.success("讀取完成！")
                     else:
                         st.error("讀取失敗。")
-                else:
-                    st.info("AI 將自動讀取數值或辨識產品名稱...")
 
-    # 數據確認區
     st.subheader("📝 確認數據 / 產品資訊")
     c1, c2 = st.columns(2)
     with c1:
@@ -523,12 +517,10 @@ with tab1:
 
     st.markdown("---")
     
-    # 執行規則分析按鈕
     if st.button("🔍 執行分析 (規則判斷)", type="primary", use_container_width=True):
         analyze_food_rules()
         st.rerun()
 
-    # 顯示結果區
     if st.session_state.analysis_result:
         res = st.session_state.analysis_result
         
@@ -551,7 +543,6 @@ with tab1:
         if res['findings']['high_sugar']:
             st.warning(f"🍬 檢出高糖成分：{', '.join(res['findings']['high_sugar'])}")
         
-        # AI 深度解析按鈕與顯示
         if not st.session_state.ai_advice:
             if st.button("✨ 呼叫 AI 營養師深度解析 (推薦)"):
                 placeholder = st.empty()
@@ -578,7 +569,7 @@ with tab1:
             st.markdown(st.session_state.ai_advice['detailed_analysis'])
             st.info(f"💡 **食用建議**：{st.session_state.ai_advice['serving_suggestion']}")
             
-            # 追問
+            # 追問 (使用 chat_input 固定在底部)
             st.markdown("---")
             st.subheader("🙋‍♀️ 還有疑問嗎？")
             
@@ -586,7 +577,6 @@ with tab1:
             for msg in st.session_state.context_chat_history:
                 st.chat_message(msg["role"]).write(msg["content"])
 
-            # 使用 chat_input (自動固定在底部)
             if follow_up_q := st.chat_input("針對此食品有疑問嗎？ (例如：我可以只吃一半嗎？)", key="follow_up_chat"):
                 st.session_state.context_chat_history.append({"role":"user", "content":follow_up_q})
                 st.chat_message("user").write(follow_up_q)
