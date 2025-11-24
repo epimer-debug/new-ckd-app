@@ -12,7 +12,7 @@ st.set_page_config(
     initial_sidebar_state="collapsed" # 手機上預設收合側邊欄，讓畫面更清爽
 )
 
-# --- 2. CSS 美化 (大按鈕、清晰卡片) ---
+# --- 2. CSS 美化 (大按鈕、清晰卡片、載入動畫) ---
 st.markdown("""
     <style>
     .main { background-color: #f8fafc; }
@@ -20,7 +20,7 @@ st.markdown("""
         border-radius: 12px; 
         height: 3.5em; 
         font-weight: bold; 
-        width: 100%; /* 滿版按鈕，方便手指點擊 */
+        width: 100%; 
         font-size: 1.1em;
     }
     .status-card {
@@ -31,15 +31,41 @@ st.markdown("""
         color: #0c4a6e; 
         margin-bottom: 20px;
         font-size: 1.0em;
+        line-height: 1.6;
     }
-    .result-card {
-        padding: 20px;
-        border-radius: 10px;
+    .sidebar-hint {
+        background-color: #fffbeb;
+        border: 1px solid #fcd34d;
+        color: #92400e;
+        padding: 10px 15px;
+        border-radius: 8px;
+        margin-bottom: 15px;
+        font-size: 0.95em;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    }
+    /* === 載入動畫區塊 === */
+    .loading-container {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        margin-top: 20px;
         margin-bottom: 20px;
-        text-align: center;
-        color: white;
+    }
+    .loading-text {
+        margin-top: 10px;
+        color: #0284c7;
         font-weight: bold;
-        font-size: 1.5em;
+        font-size: 1.2em;
+        animation: blink 1.5s infinite;
+    }
+    @keyframes blink {
+        0% { opacity: 1; }
+        50% { opacity: 0.5; }
+        100% { opacity: 1; }
     }
     /* 手機適配 */
     @media (max-width: 640px) {
@@ -50,7 +76,7 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# --- 3. 專業指引知識庫 (含 KDOQI 2020) ---
+# --- 3. 專業指引知識庫 ---
 GUIDELINE_CONTEXT = """
 【核心營養指引準則】
 請綜合參考以下權威文獻進行判斷：
@@ -71,9 +97,9 @@ GUIDELINE_CONTEXT = """
    - 綜合維他命需個別評估。
 
 【判斷邏輯與矛盾處理 (AI Override)】
-- **你的判斷擁有最高優先權**。
-- 系統可能會因為數值低而給出「綠燈」，但若你發現該食品成分對該病患有風險（例如：糖尿病患吃精緻糖、透析患吃高鉀果乾、加工食品含無機磷），請務必將 `final_risk_level` 改為 "red" 或 "yellow"。
-- **標題強制要求**：若你判定為紅燈，`summary_title` 必須明確寫出「紅燈（不建議食用）！」。
+- **你的判斷為最終依據 (AI Override)**。
+- 如果系統初步判斷為綠燈，但你發現成分中有嚴重隱患（如糖尿病患吃到精緻糖、透析患吃到高鉀果乾、加工食品含無機磷），請務必將 `final_risk_level` 改為 "red" 或 "yellow"。
+- **標題要求**：若判定為紅燈，`summary_title` 必須明確寫出「紅燈（不建議食用）！」。
 """
 
 # --- 4. 風險關鍵字資料庫 ---
@@ -114,18 +140,16 @@ if 'general_chat_history' not in st.session_state:
 
 # --- 6. 側邊欄設定 ---
 with st.sidebar:
-    st.title("🛡️ 腎友食安守門員")
+    st.header("⚙️ 病人基本資料設定") 
     
-    # 自動讀取 Secrets 或手動輸入
     api_key = ""
     if "GEMINI_API_KEY" in st.secrets:
         api_key = st.secrets["GEMINI_API_KEY"]
-        st.success("✅ 已載入系統金鑰")
     else:
         api_key = st.text_input("Gemini API Key", type="password", placeholder="請輸入 API Key")
     
     st.divider()
-    st.subheader("👤 病患狀態設定")
+    st.subheader("👤 治療狀態")
     
     treatment_status = st.radio("目前治療狀態", ["未透析 (慢性腎臟病)", "透析"], index=0)
     
@@ -143,9 +167,8 @@ with st.sidebar:
 
     st.session_state.patient_status_desc = patient_status_desc
 
-    # 共病症設定
     st.divider()
-    st.subheader("➕ 共病症 (Comorbidities)")
+    st.subheader("➕ 共病症")
     c1, c2 = st.columns(2)
     with c1:
         has_dm = st.checkbox("糖尿病", help="將嚴格檢查精緻糖分")
@@ -172,7 +195,6 @@ def analyze_food_rules():
     data = st.session_state.form_data
     ingredients = data["ingredients"]
     
-    # 無數據處理
     if data["calories"] == 0 and data["sodium"] == 0 and data["protein"] == 0:
         st.session_state.analysis_result = {
             "risk_level": "unknown",
@@ -186,7 +208,6 @@ def analyze_food_rules():
         "sodium_warning": False, "p_ratio_warning": None, "k_level": None
     }
     
-    # 關鍵字掃描
     for kw in RISK_KEYWORDS["inorganic_phosphate"]:
         if kw in ingredients: findings["inorganic_p"].append(kw)
     for kw in RISK_KEYWORDS["high_potassium_food"]:
@@ -207,18 +228,15 @@ def analyze_food_rules():
         
     if data["sodium"] > 200: findings["sodium_warning"] = True
     
-    # 規則判斷
     risk_level = "green"
     is_diabetic_risk = "糖尿病" in st.session_state.comorbidity_desc and len(findings["high_sugar"]) > 0
 
-    # 紅燈條件
     if (data["sodium"] > 400 or 
         len(findings["inorganic_p"]) > 0 or 
         "氯化鉀" in ingredients or 
         findings["k_level"] == "High" or
         is_diabetic_risk):
         risk_level = "red"
-    # 黃燈條件
     elif (data["sodium"] > 200 or 
           len(findings["high_k_food"]) > 0 or 
           len(findings["dairy"]) > 0 or
@@ -282,7 +300,6 @@ def extract_data_from_image(uploaded_file, api_key):
             extracted_data = json.loads(raw_text)
             st.session_state.form_data.update(extracted_data)
             
-            # 讀取成功後，立即清空舊結果
             st.session_state.analysis_result = None
             st.session_state.ai_advice = None
             st.session_state.context_chat_history = []
@@ -296,7 +313,7 @@ def extract_data_from_image(uploaded_file, api_key):
         return False
 
 def call_gemini_deep_analysis(prompt):
-    """AI 深度分析 - 支援覆蓋規則判斷 (Override Rule)"""
+    """AI 深度分析"""
     if not api_key:
         st.error("⚠️ 請先輸入 API Key 才能呼叫 AI")
         return None
@@ -351,7 +368,6 @@ def call_gemini_deep_analysis(prompt):
         st.error(f"連線錯誤: {str(e)}")
         return None
 
-# --- 聊天室 API 函數 ---
 def call_gemini_chat(prompt, chat_history_key=None):
     if not api_key:
         st.error("⚠️ 請先輸入 API Key")
@@ -394,6 +410,13 @@ def call_gemini_chat(prompt, chat_history_key=None):
 tab1, tab2 = st.tabs(["📊 食品掃描與分析", "💬 AI 諮詢室"])
 
 with tab1:
+    # 醒目的設定指引
+    st.markdown("""
+    <div class='sidebar-hint'>
+        👉 <b>請點擊左上角箭頭 ( > )</b> 展開側邊欄，設定<b>【病人基本資料】</b>與<b>【共病症】</b>以獲得精準分析
+    </div>
+    """, unsafe_allow_html=True)
+
     status_desc = st.session_state.get("patient_status_desc", "未設定")
     comor_desc = st.session_state.get("comorbidity_desc", "無")
     
@@ -412,14 +435,25 @@ with tab1:
             with col_img:
                 st.image(uploaded_file, caption="預覽圖片", use_container_width=True)
             with col_btn:
-                st.info("AI 將自動讀取數值或辨識產品名稱...")
+                # --- 【新增】載入動畫 ---
                 if st.button("🚀 開始 AI 讀圖", type="primary"):
-                    with st.spinner("AI 正在分析圖片中..."):
-                        success = extract_data_from_image(uploaded_file, api_key)
-                        if success:
-                            st.success("讀取完成！")
-                        else:
-                            st.error("讀取失敗。")
+                    placeholder = st.empty()
+                    placeholder.markdown("""
+                        <div class='loading-container'>
+                            <img src='https://media.giphy.com/media/3oEjI6SIIHBdRxXI40/giphy.gif' width='60'>
+                            <div class='loading-text'>AI 正在讀取圖片中...</div>
+                        </div>
+                    """, unsafe_allow_html=True)
+                    
+                    success = extract_data_from_image(uploaded_file, api_key)
+                    placeholder.empty() # 清除動畫
+                    
+                    if success:
+                        st.success("讀取完成！")
+                    else:
+                        st.error("讀取失敗。")
+                else:
+                    st.info("AI 將自動讀取數值或辨識產品名稱...")
 
     # 數據確認區
     st.subheader("📝 確認數據 / 產品資訊")
@@ -445,23 +479,18 @@ with tab1:
     if st.session_state.analysis_result:
         res = st.session_state.analysis_result
         
-        # 取得最終風險等級 (可能是規則給的，也可能是 AI 修正覆蓋後的)
         risk_level = res['risk_level']
-        
-        # 決定顯示標題
         display_summary = res['summary']
         
-        # 依據等級顯示顏色
         if risk_level == "unknown":
             st.info(f"### {display_summary}") 
         elif risk_level == "red":
-            st.error(f"### {display_summary}") # 使用 st.error 顯示紅色
+            st.error(f"### {display_summary}") 
         elif risk_level == "yellow":
-            st.warning(f"### {display_summary}") # 使用 st.warning 顯示黃色
+            st.warning(f"### {display_summary}") 
         elif risk_level == "green":
-            st.success(f"### {display_summary}") # 使用 st.success 顯示綠色
+            st.success(f"### {display_summary}") 
 
-        # 顯示警示標籤
         if res['findings']['inorganic_p']:
             st.error(f"⚠️ 檢出無機磷：{', '.join(res['findings']['inorganic_p'])}")
         if res['findings']['dairy']:
@@ -472,19 +501,24 @@ with tab1:
         # AI 深度解析按鈕與顯示
         if not st.session_state.ai_advice:
             if st.button("✨ 呼叫 AI 營養師深度解析 (推薦)"):
+                placeholder = st.empty()
+                placeholder.markdown("""
+                    <div class='loading-container'>
+                        <img src='https://media.giphy.com/media/3oEjI6SIIHBdRxXI40/giphy.gif' width='60'>
+                        <div class='loading-text'>AI 營養師正在評估中...</div>
+                    </div>
+                """, unsafe_allow_html=True)
+                
                 prompt = f"分析食品: {st.session_state.form_data}. 若數值為0，請根據產品名稱與成分描述進行定性評估。"
-                with st.spinner("AI 營養師正在依據病歷進行深度評估..."):
-                    ai_result = call_gemini_deep_analysis(prompt)
-                    if ai_result:
-                        st.session_state.ai_advice = ai_result
-                        
-                        # 【關鍵修正】AI 分析後，直接更新主狀態，覆蓋原本的紅綠燈與標題
-                        st.session_state.analysis_result['risk_level'] = ai_result['final_risk_level']
-                        st.session_state.analysis_result['summary'] = ai_result['summary_title']
-                        
-                        st.rerun() # 重新整理頁面，讓最上方的紅綠燈立刻變色
+                ai_result = call_gemini_deep_analysis(prompt)
+                placeholder.empty() # 清除動畫
+
+                if ai_result:
+                    st.session_state.ai_advice = ai_result
+                    st.session_state.analysis_result['risk_level'] = ai_result['final_risk_level']
+                    st.session_state.analysis_result['summary'] = ai_result['summary_title']
+                    st.rerun() 
         else:
-            # 顯示 AI 詳細分析
             st.markdown("### 👩‍⚕️ AI 營養師深度報告")
             st.markdown(st.session_state.ai_advice['detailed_analysis'])
             st.info(f"💡 **食用建議**：{st.session_state.ai_advice['serving_suggestion']}")
@@ -512,7 +546,18 @@ with tab2:
     if q := st.chat_input("請問營養師..."):
         st.session_state.general_chat_history.append({"role":"user", "content":q})
         st.chat_message("user").write(q)
+        
+        placeholder = st.empty()
+        placeholder.markdown("""
+            <div class='loading-container'>
+                <img src='https://media.giphy.com/media/3oEjI6SIIHBdRxXI40/giphy.gif' width='60'>
+                <div class='loading-text'>AI 正在輸入中...</div>
+            </div>
+        """, unsafe_allow_html=True)
+
         ans = call_gemini_chat(q, "general_chat_history")
+        placeholder.empty()
+
         if ans:
             st.session_state.general_chat_history.append({"role":"assistant", "content":ans})
             st.chat_message("assistant").write(ans)
