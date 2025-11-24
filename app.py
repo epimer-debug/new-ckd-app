@@ -12,7 +12,7 @@ st.set_page_config(
     initial_sidebar_state="collapsed" 
 )
 
-# --- 2. CSS 美化 (修復輸入框遮擋問題、大字體) ---
+# --- 2. CSS 美化 (修復輸入框遮擋問題、大字體、大按鈕) ---
 st.markdown("""
     <style>
     .main { background-color: #f8fafc; }
@@ -95,28 +95,27 @@ st.markdown("""
     /* === 紅框輸入區樣式 === */
     .stChatInput {
         position: fixed !important;
-        bottom: 10px !important; /* 稍微貼底一點 */
+        bottom: 20px !important;
         left: 50% !important;
         transform: translateX(-50%) !important;
-        width: 95% !important;
+        width: 90% !important;
         max-width: 800px !important;
         z-index: 1000 !important;
-        padding-bottom: 10px !important; 
+        padding-bottom: 20px !important; /* 避免被邊緣切到 */
     }
     
-    /* 輸入框本體 */
+    /* 針對 Streamlit 的聊天輸入框容器進行調整 */
     [data-testid="stChatInput"] {
-        border: 3px solid #ef4444 !important; 
+        border: 3px solid #ef4444 !important; /* 明顯的紅框 */
         border-radius: 25px !important;
-        background-color: #fff0f0 !important; 
+        background-color: #fff0f0 !important; /* 淡淡的紅色背景 */
         padding: 10px !important;
         box-shadow: 0 -5px 20px rgba(0,0,0,0.1) !important;
     }
     
-    /* === 關鍵修正：大幅增加主頁面底部留白 === */
-    /* 這讓您可以捲動到更下方，文字就不會被輸入框擋住了 */
+    /* 增加主頁面底部的留白，防止內容被輸入框擋住 */
     .main .block-container {
-        padding-bottom: 250px !important; 
+        padding-bottom: 180px !important; 
     }
 
     /* 側邊欄按鈕文字 */
@@ -136,6 +135,7 @@ st.markdown("""
         h3 { font-size: 1.5rem !important; }
         .stButton>button { font-size: 1.2rem !important; height: 3.8em; }
         [data-testid="stSidebarCollapsedControl"]::after { content: "設定病人資料"; font-size: 1rem; }
+        .stChatInput { bottom: 10px !important; width: 95% !important; }
     }
     </style>
 """, unsafe_allow_html=True)
@@ -259,6 +259,7 @@ def analyze_food_rules():
     data = st.session_state.form_data
     ingredients = data["ingredients"]
     
+    # 無數據處理
     if data["calories"] == 0 and data["sodium"] == 0 and data["protein"] == 0:
         st.session_state.analysis_result = {
             "risk_level": "unknown",
@@ -589,7 +590,7 @@ with tab1:
             st.markdown(st.session_state.ai_advice['detailed_analysis'])
             st.info(f"💡 **食用建議**：{st.session_state.ai_advice['serving_suggestion']}")
             
-            # 追問 (使用 chat_input 固定在底部)
+            # 追問
             st.markdown("---")
             st.markdown("""
             <div style="text-align: center; margin-top: 20px; margin-bottom: 10px; font-weight: bold; color: #6b7280;">
@@ -641,7 +642,8 @@ with tab2:
     </div>
     """, unsafe_allow_html=True)
     
-    if q := st.chat_input("請問營養師...", key="general_chat"):
+    # === 確保這頁的輸入框也有紅框樣式 ===
+    if q := st.chat_input("請問營養師...", key="general_chat_input"):
         st.session_state.general_chat_history.append({"role":"user", "content":q})
         st.chat_message("user").write(q)
         
