@@ -9,40 +9,13 @@ st.set_page_config(
     page_title="腎友食安守門員",
     page_icon="🛡️",
     layout="wide",
-    initial_sidebar_state="collapsed" # 手機上預設收合
+    initial_sidebar_state="collapsed" # 手機上預設收合側邊欄，讓畫面更清爽
 )
 
-# --- 2. CSS 美化 (含按鈕標籤與動畫) ---
+# --- 2. CSS 美化 (大按鈕、清晰卡片、置中大動畫) ---
 st.markdown("""
     <style>
     .main { background-color: #f8fafc; }
-    
-    /* === 關鍵修改：在側邊欄收合按鈕旁加上文字說明 === */
-    [data-testid="stSidebarCollapsedControl"] {
-        width: auto !important;
-        min-width: 200px !important; /* 確保有足夠空間顯示文字 */
-        background-color: #f0f9ff !important; /* 淡藍色背景突顯 */
-        border: 1px solid #bae6fd !important;
-        border-radius: 8px !important;
-        padding: 0.5rem !important;
-    }
-    [data-testid="stSidebarCollapsedControl"]::after {
-        content: "病人基本資料設定"; /* 這裡就是您要的文字 */
-        margin-left: 8px;
-        font-weight: bold;
-        color: #0284c7; 
-        font-size: 1rem;
-        vertical-align: middle;
-    }
-    /* 手機版稍微調整大小 */
-    @media (max-width: 640px) {
-        [data-testid="stSidebarCollapsedControl"]::after {
-            content: "設定病人資料"; /* 手機版文字短一點以免擠壓 */
-            font-size: 0.9rem;
-        }
-    }
-    /* ============================================== */
-
     .stButton>button { 
         border-radius: 12px; 
         height: 3.5em; 
@@ -61,19 +34,47 @@ st.markdown("""
         font-size: 1.0em;
         line-height: 1.6;
     }
-    .loading-container {
+    .sidebar-hint {
+        background-color: #fffbeb;
+        border: 1px solid #fcd34d;
+        color: #92400e;
+        padding: 10px 15px;
+        border-radius: 8px;
+        margin-bottom: 15px;
+        font-size: 0.95em;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    }
+    
+    /* === 全螢幕置中載入動畫 === */
+    .loading-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(255, 255, 255, 0.85); /* 半透明白底 */
+        z-index: 9999; /* 最上層 */
         display: flex;
         flex-direction: column;
         align-items: center;
         justify-content: center;
-        margin-top: 20px;
-        margin-bottom: 20px;
+        backdrop-filter: blur(5px); /* 背景模糊效果 */
+    }
+    .loading-content {
+        background: white;
+        padding: 30px;
+        border-radius: 20px;
+        box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+        text-align: center;
     }
     .loading-text {
-        margin-top: 10px;
+        margin-top: 20px;
         color: #0284c7;
         font-weight: bold;
-        font-size: 1.2em;
+        font-size: 1.5em; /* 字體加大 */
         animation: blink 1.5s infinite;
     }
     @keyframes blink {
@@ -81,10 +82,17 @@ st.markdown("""
         50% { opacity: 0.5; }
         100% { opacity: 1; }
     }
+    
+    /* 手機適配 */
+    @media (max-width: 640px) {
+        h1 { font-size: 1.8rem; }
+        h2 { font-size: 1.5rem; }
+        .stButton>button { font-size: 1.0rem; }
+    }
     </style>
 """, unsafe_allow_html=True)
 
-# --- 3. 專業指引知識庫 (含 KDOQI 2020) ---
+# --- 3. 專業指引知識庫 ---
 GUIDELINE_CONTEXT = """
 【核心營養指引準則】
 請綜合參考以下權威文獻進行判斷：
@@ -148,12 +156,13 @@ if 'general_chat_history' not in st.session_state:
 
 # --- 6. 側邊欄設定 ---
 with st.sidebar:
-    st.header("⚙️ 病人基本資料設定") 
+    # --- 修正：將提示放在這裡，使用 CSS 讓它看起來像是指向按鈕 ---
+    # 注意：實際的箭頭是 Streamlit UI 的一部分，無法直接放入，但我們可以透過版面設計來引導
+    st.markdown("### ⚙️ 病人基本資料設定") # 標題改得更明確
     
     api_key = ""
     if "GEMINI_API_KEY" in st.secrets:
         api_key = st.secrets["GEMINI_API_KEY"]
-        st.success("✅ 已載入系統金鑰")
     else:
         api_key = st.text_input("Gemini API Key", type="password", placeholder="請輸入 API Key")
     
@@ -204,7 +213,6 @@ def analyze_food_rules():
     data = st.session_state.form_data
     ingredients = data["ingredients"]
     
-    # 無數據處理
     if data["calories"] == 0 and data["sodium"] == 0 and data["protein"] == 0:
         st.session_state.analysis_result = {
             "risk_level": "unknown",
@@ -420,6 +428,12 @@ def call_gemini_chat(prompt, chat_history_key=None):
 tab1, tab2 = st.tabs(["📊 食品掃描與分析", "💬 AI 諮詢室"])
 
 with tab1:
+    st.markdown("""
+    <div class='sidebar-hint'>
+        👉 <b>請點擊左上角箭頭 ( > )</b> 展開側邊欄，設定<b>【病人基本資料】</b>與<b>【共病症】</b>以獲得精準分析
+    </div>
+    """, unsafe_allow_html=True)
+
     status_desc = st.session_state.get("patient_status_desc", "未設定")
     comor_desc = st.session_state.get("comorbidity_desc", "無")
     
@@ -439,16 +453,19 @@ with tab1:
                 st.image(uploaded_file, caption="預覽圖片", use_container_width=True)
             with col_btn:
                 if st.button("🚀 開始 AI 讀圖", type="primary"):
+                    # --- 全螢幕載入動畫 ---
                     placeholder = st.empty()
                     placeholder.markdown("""
-                        <div class='loading-container'>
-                            <img src='https://media.giphy.com/media/3oEjI6SIIHBdRxXI40/giphy.gif' width='60'>
-                            <div class='loading-text'>AI 正在讀取圖片中...</div>
+                        <div class='loading-overlay'>
+                            <div class='loading-content'>
+                                <img src='https://media.giphy.com/media/3oEjI6SIIHBdRxXI40/giphy.gif' width='80'>
+                                <div class='loading-text'>AI 正在讀取圖片中...</div>
+                            </div>
                         </div>
                     """, unsafe_allow_html=True)
                     
                     success = extract_data_from_image(uploaded_file, api_key)
-                    placeholder.empty() 
+                    placeholder.empty() # 清除動畫
                     
                     if success:
                         st.success("讀取完成！")
@@ -505,9 +522,11 @@ with tab1:
             if st.button("✨ 呼叫 AI 營養師深度解析 (推薦)"):
                 placeholder = st.empty()
                 placeholder.markdown("""
-                    <div class='loading-container'>
-                        <img src='https://media.giphy.com/media/3oEjI6SIIHBdRxXI40/giphy.gif' width='60'>
-                        <div class='loading-text'>AI 營養師正在評估中...</div>
+                    <div class='loading-overlay'>
+                        <div class='loading-content'>
+                            <img src='https://media.giphy.com/media/3oEjI6SIIHBdRxXI40/giphy.gif' width='80'>
+                            <div class='loading-text'>AI 營養師正在評估中...</div>
+                        </div>
                     </div>
                 """, unsafe_allow_html=True)
                 
@@ -551,9 +570,11 @@ with tab2:
         
         placeholder = st.empty()
         placeholder.markdown("""
-            <div class='loading-container'>
-                <img src='https://media.giphy.com/media/3oEjI6SIIHBdRxXI40/giphy.gif' width='60'>
-                <div class='loading-text'>AI 正在輸入中...</div>
+            <div class='loading-overlay'>
+                <div class='loading-content'>
+                    <img src='https://media.giphy.com/media/3oEjI6SIIHBdRxXI40/giphy.gif' width='80'>
+                    <div class='loading-text'>AI 正在輸入中...</div>
+                </div>
             </div>
         """, unsafe_allow_html=True)
 
