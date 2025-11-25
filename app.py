@@ -4,7 +4,7 @@ import json
 import base64
 import time
 
-# --- 1. 設定頁面 (手機版面優化) ---
+# --- 1. 設定頁面 ---
 st.set_page_config(
     page_title="腎友食安守門員",
     page_icon="🛡️",
@@ -12,55 +12,44 @@ st.set_page_config(
     initial_sidebar_state="collapsed" 
 )
 
-# --- 2. CSS 美化 (修復輸入框位置、大字體、大按鈕) ---
+# --- 2. CSS 美化 (移除強制懸浮，改為嵌入式紅框) ---
 st.markdown("""
     <style>
     .main { background-color: #f8fafc; }
     
-    /* === 全域字體放大 === */
-    h1 { font-size: 3rem !important; font-weight: 900 !important; color: #1e3a8a !important; }
-    h2 { font-size: 2.2rem !important; font-weight: 800 !important; color: #1e40af !important; }
-    h3 { font-size: 1.8rem !important; font-weight: 700 !important; }
-    p, .stMarkdown, li { font-size: 1.2rem !important; line-height: 1.6 !important; }
+    /* 字體放大 */
+    h1 { font-size: 2.5rem !important; font-weight: 900 !important; color: #1e3a8a !important; }
+    h2 { font-size: 2.0rem !important; font-weight: 800 !important; color: #1e40af !important; }
+    h3 { font-size: 1.5rem !important; font-weight: 700 !important; }
+    p, li { font-size: 1.1rem !important; line-height: 1.6 !important; }
     
-    /* === 按鈕樣式 === */
+    /* 按鈕樣式 */
     .stButton>button { 
         border-radius: 12px; 
-        height: 4em; 
+        height: 3.5em; 
         font-weight: bold; 
         width: 100%; 
-        font-size: 1.3em !important;
-        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        font-size: 1.1em !important;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
     }
+
+    /* === 關鍵修正：針對「追問輸入框」的紅框樣式 (不懸浮) === */
+    /* 我們會給特定的 text_input 加上 class 或直接針對結構樣式調整 */
     
-    /* === 狀態卡片 === */
+    /* 讓所有 text input 的框線變明顯，但針對紅框我們用 Python 邏輯去包裝 */
+    
+    /* 狀態卡片 */
     .status-card {
         background-color: #e0f2fe; 
-        border-left: 8px solid #0284c7;
-        padding: 20px; 
-        border-radius: 10px; 
+        border-left: 5px solid #0284c7;
+        padding: 15px; 
+        border-radius: 8px; 
         color: #0c4a6e; 
-        margin-bottom: 25px;
-        font-size: 1.3em !important;
-    }
-    
-    /* === 側邊欄提示 === */
-    .sidebar-hint {
-        background-color: #fffbeb;
-        border: 2px solid #fcd34d;
-        color: #92400e;
-        padding: 12px 18px;
-        border-radius: 10px;
         margin-bottom: 20px;
-        font-size: 1.2em;
-        font-weight: bold;
-        display: flex;
-        align-items: center;
-        gap: 12px;
-        box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+        font-size: 1.0em;
     }
-    
-    /* === 載入動畫 === */
+
+    /* 載入動畫 */
     .loading-overlay {
         position: fixed;
         top: 0;
@@ -81,61 +70,46 @@ st.markdown("""
         border-radius: 25px;
         box-shadow: 0 10px 30px rgba(0,0,0,0.15);
         text-align: center;
-        min-width: 320px;
+        min-width: 300px;
     }
     .loading-text {
         margin-top: 25px;
         color: #0284c7;
         font-weight: bold;
-        font-size: 1.8em;
+        font-size: 1.5em;
         animation: blink 1.5s infinite;
     }
     @keyframes blink { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } }
 
-    /* === 紅框輸入區樣式 === */
-    .stChatInput {
-        position: fixed !important;
-        bottom: 20px !important;
-        left: 50% !important;
-        transform: translateX(-50%) !important;
-        width: 90% !important;
-        max-width: 800px !important;
-        z-index: 1000 !important;
-        padding-bottom: 20px !important; 
-    }
-    
-    [data-testid="stChatInput"] {
-        border: 3px solid #ef4444 !important; 
-        border-radius: 25px !important;
-        background-color: #fff0f0 !important; 
-        padding: 10px !important;
-        box-shadow: 0 -5px 20px rgba(0,0,0,0.1) !important;
-    }
-    
-    /* 增加主頁面底部的留白 */
-    .main .block-container {
-        padding-bottom: 250px !important; 
-    }
-
-    /* === 側邊欄按鈕文字修正：從「病人基本資料設定」改為「基本資料設定」 === */
+    /* 側邊欄文字 */
     [data-testid="stSidebarCollapsedControl"]::after {
-        content: "基本資料設定"; /* 修改處 */
+        content: "基本資料設定";
         margin-left: 8px;
         font-weight: bold;
         color: #0284c7;
-        font-size: 1.2rem;
+        font-size: 1rem;
         vertical-align: middle;
+    }
+    
+    /* === 特別設計的紅框輸入區容器 === */
+    .red-input-container {
+        border: 2px solid #ef4444;
+        background-color: #fff0f0;
+        padding: 15px;
+        border-radius: 15px;
+        margin-top: 20px;
+        margin-bottom: 20px;
+    }
+    .red-input-label {
+        color: #ef4444;
+        font-weight: bold;
+        margin-bottom: 5px;
     }
     
     /* 手機版適配 */
     @media (max-width: 640px) {
-        h1 { font-size: 2.4rem !important; }
-        h2 { font-size: 1.8rem !important; }
-        h3 { font-size: 1.5rem !important; }
-        .stButton>button { font-size: 1.2rem !important; height: 3.8em; }
-        /* 手機版側邊欄按鈕文字 */
-        [data-testid="stSidebarCollapsedControl"]::after { content: "基本資料設定"; font-size: 1rem; }
-        .stChatInput { bottom: 10px !important; width: 95% !important; }
+        h1 { font-size: 2.0rem !important; }
+        .stButton>button { font-size: 1.0rem !important; }
     }
     </style>
 """, unsafe_allow_html=True)
@@ -204,7 +178,7 @@ if 'general_chat_history' not in st.session_state:
 
 # --- 6. 側邊欄設定 ---
 with st.sidebar:
-    st.header("⚙️ 基本資料設定") # 這裡也同步修改
+    st.header("⚙️ 基本資料設定") 
     
     api_key = ""
     if "GEMINI_API_KEY" in st.secrets:
@@ -475,7 +449,6 @@ def call_gemini_chat(prompt, chat_history_key=None):
 tab1, tab2 = st.tabs(["📊 食品掃描與分析", "💬 AI 諮詢室"])
 
 with tab1:
-    # 修改為更簡潔的提示文字
     st.markdown("""
     <div class='sidebar-hint'>
         👉 <b>請點擊左上角箭頭 ( > )</b> 展開側邊欄，設定<b>【基本資料】</b>與<b>【共病症】</b>以獲得精準分析
@@ -512,7 +485,7 @@ with tab1:
                     """, unsafe_allow_html=True)
                     
                     success = extract_data_from_image(uploaded_file, api_key)
-                    placeholder.empty() # 清除動畫
+                    placeholder.empty() 
                     
                     if success:
                         st.success("讀取完成！")
@@ -594,20 +567,27 @@ with tab1:
             
             # 追問
             st.markdown("---")
-            st.markdown("""
-            <div style="text-align: center; margin-top: 20px; margin-bottom: 10px; font-weight: bold; color: #6b7280;">
-                👇 還有疑問嗎？請在下方紅框輸入...
-            </div>
-            """, unsafe_allow_html=True)
-
+            st.subheader("🙋‍♀️ 還有疑問嗎？")
+            
             # 顯示歷史對話
             for msg in st.session_state.context_chat_history:
                 st.chat_message(msg["role"]).write(msg["content"])
 
-            if follow_up_q := st.chat_input("針對此食品有疑問嗎？ (例如：我可以只吃一半嗎？)", key="follow_up_chat"):
-                st.session_state.context_chat_history.append({"role":"user", "content":follow_up_q})
-                st.chat_message("user").write(follow_up_q)
+            # === 修正：使用 st.form 搭配 text_input ===
+            # 這會創建一個嵌入式的輸入區塊，不會浮在畫面底部
+            with st.container(): # 使用 container 包裹使其結構清晰
+                st.markdown('<div class="red-input-container"><div class="red-input-label">💊 請問營養師 (針對此食品)：</div>', unsafe_allow_html=True)
                 
+                # 使用 form 來處理輸入，這樣按 Enter 或點擊按鈕都能送出
+                with st.form(key='follow_up_form', clear_on_submit=True):
+                    follow_up_q = st.text_input("輸入您的問題...", key="follow_up_text_input", label_visibility="collapsed")
+                    submit_button = st.form_submit_button("送出問題")
+                
+                st.markdown('</div>', unsafe_allow_html=True)
+
+            if submit_button and follow_up_q:
+                st.session_state.context_chat_history.append({"role":"user", "content":follow_up_q})
+                # 顯示思考動畫
                 placeholder = st.empty()
                 placeholder.markdown("""
                     <div class='loading-overlay'>
@@ -626,7 +606,7 @@ with tab1:
                 
                 if ans:
                     st.session_state.context_chat_history.append({"role":"assistant", "content":ans})
-                    st.rerun() # 重新整理以顯示新對話
+                    st.rerun()
 
 with tab2:
     st.markdown("### 💬 AI 營養諮詢室 (一般問答)")
@@ -638,16 +618,17 @@ with tab2:
     for msg in st.session_state.general_chat_history:
         st.chat_message(msg["role"]).write(msg["content"])
         
-    st.markdown("""
-    <div style="text-align: center; margin-top: 20px; margin-bottom: 10px; font-weight: bold; color: #6b7280;">
-        👇 請在下方紅框輸入您的問題...
-    </div>
-    """, unsafe_allow_html=True)
+    # 這裡也改用嵌入式紅框，保持一致性
+    st.markdown('<div class="red-input-container"><div class="red-input-label">💊 請問營養師：</div>', unsafe_allow_html=True)
     
-    # === 確保這頁的輸入框也有紅框樣式 ===
-    if q := st.chat_input("請問營養師...", key="general_chat_input"):
+    with st.form(key='general_chat_form', clear_on_submit=True):
+        q = st.text_input("輸入您的問題...", key="general_chat_text_input", label_visibility="collapsed")
+        submit_btn = st.form_submit_button("送出問題")
+    
+    st.markdown('</div>', unsafe_allow_html=True)
+    
+    if submit_btn and q:
         st.session_state.general_chat_history.append({"role":"user", "content":q})
-        st.chat_message("user").write(q)
         
         placeholder = st.empty()
         placeholder.markdown("""
