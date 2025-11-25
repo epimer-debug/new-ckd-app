@@ -4,7 +4,7 @@ import json
 import base64
 import time
 
-# --- 1. 設定頁面 ---
+# --- 1. 設定頁面 (手機版面優化) ---
 st.set_page_config(
     page_title="腎友食安守門員",
     page_icon="🛡️",
@@ -12,56 +12,55 @@ st.set_page_config(
     initial_sidebar_state="collapsed" 
 )
 
-# --- 2. CSS 美化 (關鍵修正：將輸入框改為跟隨內容) ---
+# --- 2. CSS 美化 (修復輸入框位置、大字體、大按鈕) ---
 st.markdown("""
     <style>
     .main { background-color: #f8fafc; }
     
-    /* 字體放大 */
-    h1 { font-size: 2.5rem !important; font-weight: 900 !important; color: #1e3a8a !important; }
-    h2 { font-size: 2.0rem !important; font-weight: 800 !important; color: #1e40af !important; }
-    h3 { font-size: 1.5rem !important; font-weight: 700 !important; }
-    p, li { font-size: 1.1rem !important; line-height: 1.6 !important; }
+    /* === 全域字體放大 === */
+    h1 { font-size: 3rem !important; font-weight: 900 !important; color: #1e3a8a !important; }
+    h2 { font-size: 2.2rem !important; font-weight: 800 !important; color: #1e40af !important; }
+    h3 { font-size: 1.8rem !important; font-weight: 700 !important; }
+    p, .stMarkdown, li { font-size: 1.2rem !important; line-height: 1.6 !important; }
     
-    /* 一般按鈕樣式 */
+    /* === 按鈕樣式 === */
     .stButton>button { 
         border-radius: 12px; 
-        height: 3.5em; 
+        height: 4em; 
         font-weight: bold; 
         width: 100%; 
-        font-size: 1.1em !important;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-    }
-
-    /* === 關鍵修正：讓「追問輸入框」變成紅框且不固定在底部 === */
-    /* 針對我們指定的輸入框 key 進行樣式設定 */
-    div[data-testid="stTextInput"] input {
-        border: 2px solid #ef4444 !important; /* 紅色邊框 */
-        border-radius: 10px !important;
-        background-color: #fff0f0 !important; /* 淡紅背景 */
-        padding: 10px !important;
-        font-size: 1rem !important;
+        font-size: 1.3em !important;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
     }
     
-    /* 送出按鈕特別樣式 */
-    .send-btn button {
-        background-color: #ef4444 !important;
-        color: white !important;
-        border: none !important;
-    }
-
-    /* 狀態卡片 */
+    /* === 狀態卡片 === */
     .status-card {
         background-color: #e0f2fe; 
-        border-left: 5px solid #0284c7;
-        padding: 15px; 
-        border-radius: 8px; 
+        border-left: 8px solid #0284c7;
+        padding: 20px; 
+        border-radius: 10px; 
         color: #0c4a6e; 
-        margin-bottom: 20px;
-        font-size: 1.0em;
+        margin-bottom: 25px;
+        font-size: 1.3em !important;
     }
     
-    /* 載入動畫 */
+    /* === 側邊欄提示 === */
+    .sidebar-hint {
+        background-color: #fffbeb;
+        border: 2px solid #fcd34d;
+        color: #92400e;
+        padding: 12px 18px;
+        border-radius: 10px;
+        margin-bottom: 20px;
+        font-size: 1.2em;
+        font-weight: bold;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+    }
+    
+    /* === 載入動畫 === */
     .loading-overlay {
         position: fixed;
         top: 0;
@@ -82,25 +81,61 @@ st.markdown("""
         border-radius: 25px;
         box-shadow: 0 10px 30px rgba(0,0,0,0.15);
         text-align: center;
-        min-width: 300px;
+        min-width: 320px;
     }
     .loading-text {
         margin-top: 25px;
         color: #0284c7;
         font-weight: bold;
-        font-size: 1.5em;
+        font-size: 1.8em;
         animation: blink 1.5s infinite;
     }
     @keyframes blink { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } }
 
-    /* 側邊欄文字 */
+    /* === 紅框輸入區樣式 === */
+    .stChatInput {
+        position: fixed !important;
+        bottom: 20px !important;
+        left: 50% !important;
+        transform: translateX(-50%) !important;
+        width: 90% !important;
+        max-width: 800px !important;
+        z-index: 1000 !important;
+        padding-bottom: 20px !important; 
+    }
+    
+    [data-testid="stChatInput"] {
+        border: 3px solid #ef4444 !important; 
+        border-radius: 25px !important;
+        background-color: #fff0f0 !important; 
+        padding: 10px !important;
+        box-shadow: 0 -5px 20px rgba(0,0,0,0.1) !important;
+    }
+    
+    /* 增加主頁面底部的留白 */
+    .main .block-container {
+        padding-bottom: 250px !important; 
+    }
+
+    /* === 側邊欄按鈕文字修正：從「病人基本資料設定」改為「基本資料設定」 === */
     [data-testid="stSidebarCollapsedControl"]::after {
-        content: "病人基本資料設定";
+        content: "基本資料設定"; /* 修改處 */
         margin-left: 8px;
         font-weight: bold;
         color: #0284c7;
-        font-size: 1rem;
+        font-size: 1.2rem;
         vertical-align: middle;
+    }
+    
+    /* 手機版適配 */
+    @media (max-width: 640px) {
+        h1 { font-size: 2.4rem !important; }
+        h2 { font-size: 1.8rem !important; }
+        h3 { font-size: 1.5rem !important; }
+        .stButton>button { font-size: 1.2rem !important; height: 3.8em; }
+        /* 手機版側邊欄按鈕文字 */
+        [data-testid="stSidebarCollapsedControl"]::after { content: "基本資料設定"; font-size: 1rem; }
+        .stChatInput { bottom: 10px !important; width: 95% !important; }
     }
     </style>
 """, unsafe_allow_html=True)
@@ -169,12 +204,11 @@ if 'general_chat_history' not in st.session_state:
 
 # --- 6. 側邊欄設定 ---
 with st.sidebar:
-    st.header("⚙️ 病人基本資料設定") 
+    st.header("⚙️ 基本資料設定") # 這裡也同步修改
     
     api_key = ""
     if "GEMINI_API_KEY" in st.secrets:
         api_key = st.secrets["GEMINI_API_KEY"]
-        st.success("✅ 已載入系統金鑰")
     else:
         api_key = st.text_input("Gemini API Key", type="password", placeholder="請輸入 API Key")
     
@@ -225,6 +259,7 @@ def analyze_food_rules():
     data = st.session_state.form_data
     ingredients = data["ingredients"]
     
+    # 無數據處理
     if data["calories"] == 0 and data["sodium"] == 0 and data["protein"] == 0:
         st.session_state.analysis_result = {
             "risk_level": "unknown",
@@ -440,9 +475,10 @@ def call_gemini_chat(prompt, chat_history_key=None):
 tab1, tab2 = st.tabs(["📊 食品掃描與分析", "💬 AI 諮詢室"])
 
 with tab1:
+    # 修改為更簡潔的提示文字
     st.markdown("""
     <div class='sidebar-hint'>
-        👉 <b>請點擊左上角箭頭 ( > )</b> 展開側邊欄，設定<b>【病人基本資料】</b>與<b>【共病症】</b>以獲得精準分析
+        👉 <b>請點擊左上角箭頭 ( > )</b> 展開側邊欄，設定<b>【基本資料】</b>與<b>【共病症】</b>以獲得精準分析
     </div>
     """, unsafe_allow_html=True)
 
@@ -476,12 +512,14 @@ with tab1:
                     """, unsafe_allow_html=True)
                     
                     success = extract_data_from_image(uploaded_file, api_key)
-                    placeholder.empty() 
+                    placeholder.empty() # 清除動畫
                     
                     if success:
                         st.success("讀取完成！")
                     else:
                         st.error("讀取失敗。")
+                else:
+                    st.info("AI 將自動讀取數值或辨識產品名稱...")
 
     # 數據確認區
     st.subheader("📝 確認數據 / 產品資訊")
@@ -554,21 +592,19 @@ with tab1:
             st.markdown(st.session_state.ai_advice['detailed_analysis'])
             st.info(f"💡 **食用建議**：{st.session_state.ai_advice['serving_suggestion']}")
             
+            # 追問
             st.markdown("---")
-            
+            st.markdown("""
+            <div style="text-align: center; margin-top: 20px; margin-bottom: 10px; font-weight: bold; color: #6b7280;">
+                👇 還有疑問嗎？請在下方紅框輸入...
+            </div>
+            """, unsafe_allow_html=True)
+
             # 顯示歷史對話
             for msg in st.session_state.context_chat_history:
                 st.chat_message(msg["role"]).write(msg["content"])
 
-            # === 修正：將輸入框放在這裡，不使用 st.chat_input 的固定位置 ===
-            with st.form(key="follow_up_form", clear_on_submit=True):
-                col1, col2 = st.columns([8, 1])
-                with col1:
-                    follow_up_q = st.text_input("針對此食品有疑問嗎？ (例如：我可以只吃一半嗎？)", key="follow_up_input")
-                with col2:
-                    submit_btn = st.form_submit_button("送出")
-            
-            if submit_btn and follow_up_q:
+            if follow_up_q := st.chat_input("針對此食品有疑問嗎？ (例如：我可以只吃一半嗎？)", key="follow_up_chat"):
                 st.session_state.context_chat_history.append({"role":"user", "content":follow_up_q})
                 st.chat_message("user").write(follow_up_q)
                 
@@ -602,15 +638,14 @@ with tab2:
     for msg in st.session_state.general_chat_history:
         st.chat_message(msg["role"]).write(msg["content"])
         
-    # 這裡也是用同樣的 Form 方式，讓輸入框跟隨在對話最後面
-    with st.form(key="general_chat_form", clear_on_submit=True):
-        col1, col2 = st.columns([8, 1])
-        with col1:
-            q = st.text_input("請問營養師...", key="general_chat_input")
-        with col2:
-            submit_btn = st.form_submit_button("送出")
-
-    if submit_btn and q:
+    st.markdown("""
+    <div style="text-align: center; margin-top: 20px; margin-bottom: 10px; font-weight: bold; color: #6b7280;">
+        👇 請在下方紅框輸入您的問題...
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # === 確保這頁的輸入框也有紅框樣式 ===
+    if q := st.chat_input("請問營養師...", key="general_chat_input"):
         st.session_state.general_chat_history.append({"role":"user", "content":q})
         st.chat_message("user").write(q)
         
